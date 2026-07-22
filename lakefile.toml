@@ -1,0 +1,10 @@
+name = "liveness"
+version = "0.1.0"
+defaultTargets = ["liveness"]
+
+[[lean_lib]]
+name = "Liveness"
+
+[[lean_exe]]
+name = "liveness"
+root = "Main"
