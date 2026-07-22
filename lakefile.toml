@@ -2,6 +2,11 @@ name = "liveness"
 version = "0.1.0"
 defaultTargets = ["liveness"]
 
+[[require]]
+name = "veil"
+git = "https://github.com/verse-lab/veil.git"
+rev = "main"
+
 [[lean_lib]]
 name = "Liveness"
 
