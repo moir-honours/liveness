@@ -5,7 +5,10 @@ defaultTargets = ["liveness"]
 [[require]]
 name = "veil"
 git = "https://github.com/verse-lab/veil.git"
-rev = "main"
+# Veil's liveness API currently lives on the veil-live-demo branch. Pin the
+# feature commit so this project cannot silently resolve to an incompatible
+# revision if that branch moves.
+rev = "39fb34da03c9a4cbbe05b438ecc419489ad0cff8"
 
 [[lean_lib]]
 name = "Liveness"
