@@ -4,28 +4,46 @@ import Veil.Liveness
 -- source: https://members.loria.fr/SMerz/papers/distributed-bakery/BakeryDistributed.tla
 
 
+
+
 veil module BakeryDeconstructed
 
 type process
 type sequence_t
-enum state = {ncs, M, M0, L, cs, p, Lb, L2, L3}
+
+/-  As explained in Lamport's paper, there are 1 through N main processes.
+    Each process i has N - 1 subprocesses j ≠ i for reading, and N - 1
+    processes for writing.
+
+-/
+enum pc_main = {ncs, M, M0, L, cs, p}
+enum pc_sub = {ch, test, Lb, L2, L3 }
+enum pc_wr = {wr}
 
 instantiate sequence : TotalOrderWithZero sequence_t
 instantiate thread : TotalOrderWithZero process
 
 
+relation unchecked: process → process → Bool
 
 immutable individual one_th: process
 immutable individual one: sequence_t
 
 /- Variables -/
 function number   : process → sequence_t
-function pc : process → state
-
 function localNum : process → process → ℕ
 function localCh  : process → process → ℕ
-function unRead  : process → process → ℕ
+
 function v  : process → ℕ
+
+
+function mainPc : process → pc_main
+function subPc  : process → process → pc_sub
+function wrPc   : process → process → pc_wr
+
+relation unRead  : process → process → Bool
+
+
 
 #gen_state
 
@@ -57,25 +75,61 @@ assumption [zero_one] next sequence.zero one
 
 
 
+/- Initial State -/
 after_init {
+    /- Global Variables-/
     number P := sequence.zero
     localNum P Q := 0
     localCh P Q := 0
+
+    /- Process Main -/
+    unRead P Q := false
     v P := 0
-    pc P := ncs
+
+    mainPc P := ncs
+    subPc  P Q := ch
+    wrPc   P Q := wr
 
 }
 
+
+/- Non Critical State -/
 action NCS (self: process) {
-    require pc self = ncs
-    pc self := M
+    require mainPc self = ncs
+    mainPc self := M
 }
 
+/- Announce I is choosing -/
 action M (self: process) {
-    require pc self = M
+    require mainPc self = M
+    require ∀ q, q ≠ self → subPc self q = test
+
+    mainPc self := M0
 }
 
 
+/- Read tickets and choose new ticket val -/
+action M0 (self: process) {
+    require mainPc self = M0
+
+    if (∃ i, unRead self i) then
+      let i :| unRead self i
+      unRead self i := false
+
+
+
+      mainPc self := M0
+    else
+      mainPc self := ncs
+}
+
+/- Wait for comparisons -/
+-- action L ()
+
+-- action cs
+
+/- Release ticket -/
+-- action p
 
 
 
