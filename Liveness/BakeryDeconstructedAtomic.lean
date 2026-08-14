@@ -6,7 +6,7 @@ import Veil.Liveness
 
 
 
-veil module BakeryDeconstructed
+veil module BakeryDeconstructedAtomic
 
 type process
 type sequence_t
@@ -78,6 +78,7 @@ after_init {
     number P := sequence.zero
     localNum P Q := sequence.zero
     localCh P Q := false
+    localQm P Q := false
 
     /- Process Main -/
     unRead P Q := false
@@ -100,7 +101,7 @@ action evtNCS (self: process) {
     mainPc self := M
 }
 
-/- Announce I is choosing -/
+/- Announce I is choosing, pick next ticket -/
 action evtM (self: process) {
     require mainPc self = M
     require ∀ other, other ≠ self → subPc self other = test
@@ -123,23 +124,6 @@ action evtM (self: process) {
 
 }
 
-
-/- Read tickets and choose new ticket val -/
-/- Used in the non-atomic version         -/
--- action M0 (self: process) {
---     require mainPc self = M0
-
---     if (∃ j, unRead self j) then
---       let j :| unRead self j
-
-
-
---       unRead self j := false
---       mainPc self := M0
---     else
---       mainPc self := ncs
--- }
-
 /- Wait for comparisons -/
 action evtL (self: process) {
   require mainPc self = L
@@ -155,7 +139,7 @@ action evtCs (self: process) {
 
 }
 
-action p (self: process) {
+action evtP (self: process) {
     require mainPc self = p
 
     number self := sequence.zero
@@ -170,7 +154,7 @@ action p (self: process) {
 
 
 /- Raise choosing flag -/
-action ch (self other: process) {
+action evtCh (self other: process) {
     require self ≠ other
     require subPc self other = ch
     require mainPc self = M
@@ -179,9 +163,8 @@ action ch (self other: process) {
     subPc self other := test
 }
 
-
 /-  Publish local ticket number -/
-action test (self other: process) {
+action evtTest (self other: process) {
     require self ≠ other
     require subPc self other = test
     -- require mainPc self = L
@@ -191,23 +174,22 @@ action test (self other: process) {
 }
 
 /- Lower the choosing flag -/
-action Lb (self other: process) {
+action evtLb (self other: process) {
     require self ≠ other
     require subPc self other = Lb
 
     localCh other self := false
 }
 
-
 /- Wait for other processes to lower their choosing flag -/
-action L2 (self other: process) {
+action evtL2 (self other: process) {
     require self ≠ other
     require subPc self other = L2
     require localCh self other = false
     subPc self other := L3
 }
 
-action L3 (self other: process) {
+action evtL3 (self other: process) {
     require self ≠ other
     require subPc self other = L3
     require (localNum self other ≠ sequence.zero ∧ localQm self other ≠ true) →
@@ -219,7 +201,7 @@ action L3 (self other: process) {
 -- (***************************************************************************)
 
 /- Release ticket -/
-action wr (self other: process) {
+action evtWr (self other: process) {
     require self ≠ other
     require wrPc self other = wr
     require localQm other self = true
@@ -232,12 +214,28 @@ action wr (self other: process) {
 }
 
 
+-- (***************************************************************************)
+-- (* Invariants
+-- (***************************************************************************)
+
+invariant [critical_lowest]
+  mainPc I = cs →
+    ∀ J, J ≠ I →
+      number J = sequence.zero ∨
+      prec (number I) (number J) I J
+
+invariant [critical_has_ticket]
+    mainPc I = cs →
+        number I ≠ sequence.zero
+
+invariant [positive_ticket]
+  mainPc I = cs → number I ≠ sequence.zero
 
 safety [mutex] mainPc I = cs ∧ mainPc J = cs → I = J
 
 set_option maxHeartbeats 2500000
 #gen_spec
--- #check_invariants
+#check_invariants
 
 #model_check
 { process := Fin 2,
@@ -249,5 +247,4 @@ set_option maxHeartbeats 2500000
   one := 1 }
 
 
-sub_pc_state
-end BakeryDeconstructed
+end BakeryDeconstructedAtomic
