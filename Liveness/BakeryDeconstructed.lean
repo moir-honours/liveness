@@ -31,8 +31,8 @@ immutable individual one: sequence_t
 
 /- Variables -/
 function number   : process → sequence_t
-function localNum : process → process → ℕ
-function localCh  : process → process → ℕ
+function localNum : process → process → sequence_t
+function localCh  : process → process → Bool
 function localQm  : process → process → Bool
 
 function v  : process → ℕ
@@ -80,8 +80,8 @@ assumption [zero_one] next sequence.zero one
 after_init {
     /- Global Variables-/
     number P := sequence.zero
-    localNum P Q := 0
-    localCh P Q := 0
+    localNum P Q := sequence.zero
+    localCh P Q := false
 
     /- Process Main -/
     unRead P Q := false
@@ -140,11 +140,17 @@ action L (self: process) {
 -- action cs
 action cs (self: process) {
   require mainPc self = cs
+  mainPc self := p
 
 }
 
 action p (self: process) {
     require mainPc self = p
+
+    number self := sequence.zero
+    localNum OTHER self := sequence.zero
+    localQm OTHER self := true
+    mainPc self := ncs
 }
 
 -- (***************************************************************************)
@@ -152,28 +158,49 @@ action p (self: process) {
 -- (***************************************************************************)
 
 
+/- Raise choosing flag -/
 action ch (self other: process) {
+    require self ≠ other
     require subPc self other = ch
+    require mainPc self = M
+
+    localCh other self := true
+    subPc self other := test
 }
 
+
+/-  Publish local ticket number -/
 action test (self other: process) {
     require self ≠ other
     require subPc self other = test
+    -- require mainPc self = L
+
+    localNum other self := number self
+    subPc self other := Lb
 }
 
+/- Lower the choosing flag -/
 action Lb (self other: process) {
     require self ≠ other
     require subPc self other = Lb
+
+    localCh other self := false
 }
 
+
+/- Wait for other processes to lower their choosing flag -/
 action L2 (self other: process) {
     require self ≠ other
     require subPc self other = L2
+    require localCh self other = false
+    subPc self other := L3
 }
 
 action L3 (self other: process) {
     require self ≠ other
     require subPc self other = L3
+    require (localNum self other ≠ sequence.zero ∧ localQm self other ≠ true) →
+      prec (number self) (localNum self other) self other
 }
 
 -- (***************************************************************************)
@@ -187,14 +214,11 @@ action wr (self other: process) {
     require localQm other self = true
     require mainPc self = M ∨ mainPc self = ncs
 
-    localNum other self := 0
+    localNum other self := sequence.zero
     localQm other self := false
 
     wrPc self other := wr
 }
-
-
-
 
 
 end BakeryDeconstructed
