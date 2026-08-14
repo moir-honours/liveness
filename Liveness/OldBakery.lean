@@ -1,5 +1,4 @@
 import Veil
-import Veil.Liveness
 
 -- Language options
 set_option linter.dupNamespace false

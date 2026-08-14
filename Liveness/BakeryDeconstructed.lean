@@ -33,6 +33,7 @@ immutable individual one: sequence_t
 function number   : process → sequence_t
 function localNum : process → process → ℕ
 function localCh  : process → process → ℕ
+function localQm  : process → process → Bool
 
 function v  : process → ℕ
 
@@ -92,6 +93,10 @@ after_init {
 
 }
 
+-- (***************************************************************************)
+-- (* Main Process States
+-- (***************************************************************************)
+
 
 /- Non Critical State -/
 action NCS (self: process) {
@@ -100,10 +105,11 @@ action NCS (self: process) {
 }
 
 /- Announce I is choosing -/
-action M (self: process) {
+action evtM (self: process) {
     require mainPc self = M
     require ∀ q, q ≠ self → subPc self q = test
 
+    unRead self Q := if Q = self then false else true
     mainPc self := M0
 }
 
@@ -112,24 +118,80 @@ action M (self: process) {
 action M0 (self: process) {
     require mainPc self = M0
 
-    if (∃ i, unRead self i) then
-      let i :| unRead self i
-      unRead self i := false
+    if (∃ j, unRead self j) then
+      let j :| unRead self j
 
 
 
+      unRead self j := false
       mainPc self := M0
     else
       mainPc self := ncs
 }
 
 /- Wait for comparisons -/
--- action L ()
+action L (self: process) {
+  require mainPc self = L
+  require ∀ q, q ≠ self → subPc self q = ch
+
+  mainPc self := cs
+}
 
 -- action cs
+action cs (self: process) {
+  require mainPc self = cs
+
+}
+
+action p (self: process) {
+    require mainPc self = p
+}
+
+-- (***************************************************************************)
+-- (* Sub Process States
+-- (***************************************************************************)
+
+
+action ch (self other: process) {
+    require subPc self other = ch
+}
+
+action test (self other: process) {
+    require self ≠ other
+    require subPc self other = test
+}
+
+action Lb (self other: process) {
+    require self ≠ other
+    require subPc self other = Lb
+}
+
+action L2 (self other: process) {
+    require self ≠ other
+    require subPc self other = L2
+}
+
+action L3 (self other: process) {
+    require self ≠ other
+    require subPc self other = L3
+}
+
+-- (***************************************************************************)
+-- (* Write Process State
+-- (***************************************************************************)
 
 /- Release ticket -/
--- action p
+action wr (self other: process) {
+    require self ≠ other
+    require wrPc self other = wr
+    require localQm other self = true
+    require mainPc self = M ∨ mainPc self = ncs
+
+    localNum other self := 0
+    localQm other self := false
+
+    wrPc self other := wr
+}
 
 
 

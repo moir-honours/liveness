@@ -299,6 +299,8 @@ safety [mutual_exclusion] pc I = cs ∧ pc J = cs → I = J
 
 set_option maxHeartbeats 2500000
 #gen_spec
+#check_invariants
+
 /-
 Note that:
 `process := Fin 2` corresponds to `N = 2`
