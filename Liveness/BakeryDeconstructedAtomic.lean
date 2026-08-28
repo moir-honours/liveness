@@ -3,9 +3,6 @@ import Veil.Liveness
 
 -- source: https://members.loria.fr/SMerz/papers/distributed-bakery/BakeryDistributed.tla
 
-
-
-
 veil module BakeryDeconstructedAtomic
 
 type process
@@ -23,17 +20,14 @@ enum pc_wr = {wr}
 instantiate sequence : TotalOrderWithZero sequence_t
 instantiate thread : TotalOrderWithZero process
 
-
-relation unchecked: process → process → Bool
-
 immutable individual one_th: process
 immutable individual one: sequence_t
 
 /- Variables -/
 function number   : process → sequence_t
 function localNum : process → process → sequence_t
-function localCh  : process → process → Bool
-function localQm  : process → process → Bool
+relation localCh  : process → process → Bool
+relation localQm  : process → process → Bool
 
 function v  : process → ℕ
 
