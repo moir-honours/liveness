@@ -8,17 +8,16 @@ type sequence_t
 
 enum pc_state = { ncs, e1, e2, e3, e4, w1, w2, cs, exit }
 
+-- Sequence is for ticket numbers, thread is for process ids
 instantiate sequence : TotalOrderWithZero sequence_t
 instantiate thread : TotalOrderWithZero process
 
 immutable individual one_th: process
 immutable individual one: sequence_t
 
--- relation number: process → sequence_t → Bool
+/- Variables -/
 function number : process → sequence_t
 function flag : process → Bool
-
-/- Local variables -/
 relation unchecked: process → process → Bool
 function max : process → sequence_t
 function nxt : process → process

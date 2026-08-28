@@ -17,6 +17,7 @@ enum pc_main = {ncs, M, M0, L, cs, p}
 enum pc_sub = {ch, test, Lb, L2, L3 }
 enum pc_wr = {wr}
 
+-- Sequence is for ticket numbers, thread is for process ids
 instantiate sequence : TotalOrderWithZero sequence_t
 instantiate thread : TotalOrderWithZero process
 
