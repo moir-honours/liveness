@@ -44,6 +44,9 @@ assumption [zero_one] next sequence.zero one
 ghost relation vCritical (v : process) :=
   (pc v = cs)
 
+ghost relation vNotCritical (v : process) :=
+  (pc v ≠ cs)
+
 ghost relation prec (a1 b1 : sequence_t) (a2 b2 : process) :=
   (lt a1 b1 ∨ (a1 = b1 ∧ lt_thread a2 b2))
 
@@ -398,18 +401,33 @@ theorem evtCS_mutual_exclusion (ρ : Type) (σ : Type) (process : Type) [process
 
 
 
--- temporal [success] ∀ x : process, 𝒲ℱ (evtW2 x) → ◇ ⌜ vCritical x ⌝
+temporal [success] ∀ x : process, 𝒲ℱ (evtW1 x) → ◇ ⌜ vCritical x ⌝
 
--- prove_temporal_by [success]
-
---   tstart hInit hNext hInv
---   tclear hInv
---   tdsimp only [success]
---   intro hwf
+prove_temporal_by [success]
 
 
+  tstart hInit hNext hInv
 
---   sorry
+  tclear hInv
+  tdsimp only [success]
+  intro hwf
+
+
+  -- Reduce goal to `v not in critical ↝  v in critical`
+
+
+  -- tsuffices hleadsto :
+  --   ∀ v : process,
+  --     ⌜fun st => (veil_term% vNotCritical) st⌝ ↝
+  --       ⌜fun st => (veil_term% vCritical) st⌝ by
+    -- sorry
+
+
+  sorry
+
+
+
+
 
 
 /-
