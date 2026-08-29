@@ -245,6 +245,92 @@ set_option maxHeartbeats 2500000
 
 
 @[veil]
+theorem evtW1_mutual_exclusion (ρ : Type) (σ : Type) (process : Type) [process_dec_eq : DecidableEq.{1} process]
+    [process_inhabited : Inhabited.{1} process] (sequence_t : Type) [sequence_t_dec_eq : DecidableEq.{1} sequence_t]
+    [sequence_t_inhabited : Inhabited.{1} sequence_t] (pc_main : Type) [pc_main_dec_eq : DecidableEq.{1} pc_main]
+    [pc_main_inhabited : Inhabited.{1} pc_main] [pc_main_Enum : @pc_main_EnumClass pc_main]
+    [sequence : TotalOrderWithZero sequence_t] [thread : TotalOrderWithZero process] (χ : State.Label → Type)
+    [χ_rep :
+      ∀ __veil_f,
+        Veil.FieldRepresentation (State.Label.toDomain process sequence_t pc_main __veil_f)
+          (State.Label.toCodomain process sequence_t pc_main __veil_f) (χ __veil_f)]
+    [χ_rep_lawful :
+      ∀ __veil_f,
+        Veil.LawfulFieldRepresentation (State.Label.toDomain process sequence_t pc_main __veil_f)
+          (State.Label.toCodomain process sequence_t pc_main __veil_f) (χ __veil_f) (χ_rep __veil_f)]
+    [σ_sub : IsSubStateOf (@State χ) σ] [ρ_sub : IsSubReaderOf (@Theory process sequence_t pc_main) ρ]
+    [evtW1_dec_0 : delta% @Bakery.evtW1._veil_dec_type_0 process χ sequence_t pc_main χ_rep] :
+    ∀ (self : process),
+      Veil.VeilM.meetsSpecificationIfSuccessfulAssuming
+        (@evtW1.ext ρ σ process process_dec_eq process_inhabited sequence_t sequence_t_dec_eq sequence_t_inhabited
+          pc_main pc_main_dec_eq pc_main_inhabited pc_main_Enum sequence thread χ χ_rep χ_rep_lawful σ_sub ρ_sub
+          evtW1_dec_0 self)
+        (@Assumptions ρ process process_dec_eq process_inhabited sequence_t sequence_t_dec_eq sequence_t_inhabited
+          pc_main pc_main_dec_eq pc_main_inhabited pc_main_Enum sequence thread ρ_sub)
+        (@Invariants ρ σ process process_dec_eq process_inhabited sequence_t sequence_t_dec_eq sequence_t_inhabited
+          pc_main pc_main_dec_eq pc_main_inhabited pc_main_Enum sequence thread χ χ_rep χ_rep_lawful σ_sub ρ_sub)
+        (@mutual_exclusion ρ σ process process_dec_eq process_inhabited sequence_t sequence_t_dec_eq
+          sequence_t_inhabited pc_main pc_main_dec_eq pc_main_inhabited pc_main_Enum sequence thread χ χ_rep
+          χ_rep_lawful σ_sub ρ_sub) :=
+  by
+  unveil
+  classical
+
+
+  /-  We need to show that when the extW1 transition happens, mutex is preserved.
+      This action can move a node either back to W2 or to CS, so both cases will need to be handled.
+
+  -/
+
+  show st.pc self = w1 →
+    if ∃ i, st.unchecked self i = true then
+      ∀ (i : process),
+        st.unchecked self i = true →
+          st.flag i = false →
+            ∀ (I J : process), (if self = I then w2 else st.pc I) = cs → (if self = J then w2 else st.pc J) = cs → I = J
+    else ∀ (I J : process), (¬self = I → st.pc I = cs) → (¬self = J → st.pc J = cs) → I = J
+
+
+  -- Introduce predicates and invariants
+  intro self_was_w1
+  rcases hinv with ⟨num_non_zero, flag_raised, nxt_not_self, unchecked_not_self, critical_section, nxt_e2_e3, cs_precedes_all, mutex⟩
+
+
+  -- Handle each branch of the if in W1 seperately.
+  split_ifs with h₁
+
+  · -- There exists k : unchecked self k = true
+    -- k is called i in the action transition above TODO: Fix
+    intro k unchecked_i_self n_flag_i i j i_cs j_cs
+    show i = j
+
+    sorry
+
+
+
+
+  · -- There doesn't exists i : unchecked self i = true
+    intro i j self_neq_i_implies_cs_i self_neq_j_implies_cs_j
+    show i = j
+    apply mutex
+
+
+    -- Check if
+    · show st.pc i = cs
+      by_cases h : (self = i)
+      ·
+
+        sorry
+      · exact self_neq_i_implies_cs_i h
+
+    · show st.pc j = cs
+      sorry
+
+
+
+
+
+@[veil]
 theorem evtCS_mutual_exclusion (ρ : Type) (σ : Type) (process : Type) [process_dec_eq : DecidableEq.{1} process]
     [process_inhabited : Inhabited.{1} process] (sequence_t : Type) [sequence_t_dec_eq : DecidableEq.{1} sequence_t]
     [sequence_t_inhabited : Inhabited.{1} sequence_t] (pc_main : Type) [pc_main_dec_eq : DecidableEq.{1} pc_main]
@@ -272,6 +358,7 @@ theorem evtCS_mutual_exclusion (ρ : Type) (σ : Type) (process : Type) [process
           χ_rep_lawful σ_sub ρ_sub) :=
   by
   unveil
+
   /-  We need to show that mutual exclusion between all processes when an arbitrary process 'self' exits
       its critical section.
   -/
@@ -308,31 +395,6 @@ theorem evtCS_mutual_exclusion (ρ : Type) (σ : Type) (process : Type) [process
       exact self_was_cs
     · rw [if_neg (Ne.symm self_is_j)] at j_cs
       exact j_cs
-
-
-
-
-
-
-
-
-
-
-
-
-#print axioms evtCS_mutual_exclusion
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
