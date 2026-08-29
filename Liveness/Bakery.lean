@@ -272,12 +272,8 @@ theorem evtCS_mutual_exclusion (ρ : Type) (σ : Type) (process : Type) [process
           χ_rep_lawful σ_sub ρ_sub) :=
   by
   unveil
-
-  /- Current goal -/
-  /-  If process self is in it's critical section, this implies that for all processes i, j : i ≠ self and j ≠ self,
-      if both i and j are in their critical sections, then i = j.
-
-      The state of self is the only one that changes under this transition
+  /-  We need to show that mutual exclusion between all processes when an arbitrary process 'self' exits
+      its critical section.
   -/
 
   show  st.pc self = cs →
@@ -286,44 +282,34 @@ theorem evtCS_mutual_exclusion (ρ : Type) (σ : Type) (process : Type) [process
               (if self = J then exit else st.pc J) = cs →
                 I = J
 
-  -- In the implication above, we extract all predicates
+  -- Extract all predicates from the statement above, then bring all invariants into the context
   intros self_was_cs i j i_cs j_cs
-
-  -- Invariants
   rcases hinv with ⟨num_non_zero, flag_raised, nxt_not_self, unchecked_not_self, critical_section, nxt_e2_e3, cs_precedes_all, mutex⟩
 
   -- Now the goal is to show, under the previous assumptions, i = j.
   show i = j
-
-
   apply mutex
 
-  /-  We know that i and j were mutually exclusive in the last state, and process self
-      is now entering CS. By applying mutex, we just need to show that i and j are in cs.
-
-  -/
+  -- As mutex held before the transition, it suffices to show that st.pc i = cs and st.pc j = cs
 
   · -- First show state i = cs
     show st.pc i = cs
 
     by_cases self_is_i : (i = self)
-
-    -- Case that self = i
     · rw [self_is_i]
       exact self_was_cs
-
-    -- Case self ≠ i
-
     · rw [if_neg (Ne.symm self_is_i)] at i_cs
       exact i_cs
+
   · -- Now show state j = cs
     show st.pc j = cs
-
     by_cases self_is_j : (j = self)
     · rw [self_is_j]
       exact self_was_cs
     · rw [if_neg (Ne.symm self_is_j)] at j_cs
       exact j_cs
+
+
 
 
 
