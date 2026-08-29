@@ -13,6 +13,8 @@ type sequence_t
     processes for writing.
 
 -/
+
+-- Process states
 enum pc_main = {ncs, M, M0, L, cs, p}
 enum pc_sub = {ch, test, Lb, L2, L3 }
 enum pc_wr = {wr}
@@ -29,10 +31,7 @@ function number   : process → sequence_t
 function localNum : process → process → sequence_t
 relation localCh  : process → process → Bool
 relation localQm  : process → process → Bool
-
 function v  : process → ℕ
-
-
 function mainPc : process → pc_main
 function subPc  : process → process → pc_sub
 function wrPc   : process → process → pc_wr
@@ -41,15 +40,14 @@ relation unRead  : process → process → Bool
 
 #gen_state
 
-
-/- Ticket number lt -/
+-- Ticket number less than
 theory ghost relation lt (x y : sequence_t) :=
     sequence.le x y ∧ x ≠ y
 
 theory ghost relation next (x y : sequence_t) :=
     (lt x y ∧ ∀ z, lt x z → sequence.le y z)
 
-/- Process number lt -/
+-- Process id less than
 theory ghost relation lt_thread (x y : process) :=
     (thread.le x y ∧ x ≠ y)
 

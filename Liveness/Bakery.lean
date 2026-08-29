@@ -6,7 +6,9 @@ veil module Bakery
 type process
 type sequence_t
 
-enum pc_state = { ncs, e1, e2, e3, e4, w1, w2, cs, exit }
+
+-- Process states
+enum pc_main = { ncs, e1, e2, e3, e4, w1, w2, cs, exit }
 
 -- Sequence is for ticket numbers, thread is for process ids
 instantiate sequence : TotalOrderWithZero sequence_t
@@ -21,17 +23,17 @@ function flag : process → Bool
 relation unchecked: process → process → Bool
 function max : process → sequence_t
 function nxt : process → process
-function pc : process → pc_state
+function pc : process → pc_main
 
 #gen_state
 
+-- Ticket number less than
 theory ghost relation lt (x y : sequence_t) := (sequence.le x y ∧ x ≠ y)
 theory ghost relation next (x y : sequence_t) := (lt x y ∧ ∀ z, lt x z → sequence.le y z)
 
+-- Process id less than
 theory ghost relation lt_thread (x y : process) := (thread.le x y ∧ x ≠ y)
 theory ghost relation next_thread (x y : process) := (lt_thread x y ∧ ∀ z, lt_thread x z → thread.le y z)
-
-
 
 assumption [zero_one_th] next_thread thread.zero one_th
 assumption [one_index_th] ∀i, thread.le thread.zero i
@@ -63,6 +65,9 @@ ghost relation pc_e4_w1_w2 (i j : process) :=
 ghost relation before (i j : process) :=
   number_gt_zero i ∧ (pc_ncs_e1_exit j ∨ pc_ex i j ∨ pc_e3 i j ∨ pc_e4_w1_w2 i j)
 
+
+
+-- Initial State
 after_init {
   number P := sequence.zero
   flag P := false
@@ -72,11 +77,13 @@ after_init {
   pc P := ncs
 }
 
-
+-- Non Critical State
 action evtNCS (self : process) {
   require pc self = ncs
   pc self := e1
 }
+
+/- Doorway starts -/
 
 action evtE1_branch1 (self : process) {
   require pc self = e1
@@ -142,6 +149,8 @@ action evtE4_branch2 (self : process) {
   pc self := w1
 }
 
+/- Doorway Ends -/
+
 
 action evtW1 (self : process) {
   require pc self = w1
@@ -175,6 +184,7 @@ action evtCS (self : process) {
 }
 
 
+
 action evtExit_branch1 (self : process) {
   require pc self = exit
   let k ← pick sequence_t
@@ -190,46 +200,168 @@ action evtExit_branch2 (self : process) {
 
 
 
-invariant [p1_non_zero_number] pc I = e4 ∨ pc I = w1 ∨ pc I = w2 ∨ pc I = cs → ¬(number I = sequence.zero)
-invariant [p2_flag_e2_e3] pc I = e2 ∨ pc I = e3 → flag I
-invariant [p3_nxt_not_self] pc I = w2 → ¬ (nxt I = I)
-invariant [p4_unchecked_not_self] pc I = w1 ∨ pc I = w2 → ¬(unchecked I I)
-invariant [p5_critical_section] pc I = w1 ∨ pc I = w2 → ∀j, (j ≠ I ∧ ¬unchecked I j) → before I j
+invariant [p1_non_zero_number]
+  pc I = e4 ∨ pc I = w1 ∨ pc I = w2 ∨ pc I = cs →
+    ¬(number I = sequence.zero)
+
+invariant [p2_flag_e2_e3]
+  pc I = e2 ∨ pc I = e3 →
+    flag I
+
+invariant [p3_nxt_not_self]
+  pc I = w2 →
+    ¬(nxt I = I)
+
+invariant [p4_unchecked_not_self]
+  pc I = w1 ∨ pc I = w2 →
+    ¬(unchecked I I)
+
+invariant [p5_critical_section]
+  pc I = w1 ∨ pc I = w2 →
+    ∀j, (j ≠ I ∧ ¬unchecked I j) →
+      before I j
+
 invariant [p6_nxt_e2_e3]
   pc I = w2 ∧
   ((pc (nxt I) = e2 ∧ ¬unchecked (nxt I) I) ∨ (pc (nxt I) = e3)) →
     (sequence.le (number I) (max (nxt I)))
-invariant [p7_cs_precedes_all] pc I = cs → ∀j, (j ≠ I) → before I j
+
+invariant [p7_cs_precedes_all]
+  pc I = cs →
+    ∀j, (j ≠ I) →
+      before I j
 
 /- Ensures no two processes are in critical section simultaneously. -/
-safety [mutual_exclusion] pc I = cs ∧ pc J = cs → I = J
+safety [mutual_exclusion]
+  pc I = cs ∧ pc J = cs → I = J
 
 set_option maxHeartbeats 2500000
+
+
 
 #gen_spec
 
 #check_invariants
 
-#print State.Label
 
--- theorem enter_mutex : ∀ (st st' : State),
---   assumptions st → inv st → evtW2 st st' → mutual_exclusion st' := by
+@[veil]
+theorem evtCS_mutual_exclusion (ρ : Type) (σ : Type) (process : Type) [process_dec_eq : DecidableEq.{1} process]
+    [process_inhabited : Inhabited.{1} process] (sequence_t : Type) [sequence_t_dec_eq : DecidableEq.{1} sequence_t]
+    [sequence_t_inhabited : Inhabited.{1} sequence_t] (pc_main : Type) [pc_main_dec_eq : DecidableEq.{1} pc_main]
+    [pc_main_inhabited : Inhabited.{1} pc_main] [pc_main_Enum : @pc_main_EnumClass pc_main]
+    [sequence : TotalOrderWithZero sequence_t] [thread : TotalOrderWithZero process] (χ : State.Label → Type)
+    [χ_rep :
+      ∀ __veil_f,
+        Veil.FieldRepresentation (State.Label.toDomain process sequence_t pc_main __veil_f)
+          (State.Label.toCodomain process sequence_t pc_main __veil_f) (χ __veil_f)]
+    [χ_rep_lawful :
+      ∀ __veil_f,
+        Veil.LawfulFieldRepresentation (State.Label.toDomain process sequence_t pc_main __veil_f)
+          (State.Label.toCodomain process sequence_t pc_main __veil_f) (χ __veil_f) (χ_rep __veil_f)]
+    [σ_sub : IsSubStateOf (@State χ) σ] [ρ_sub : IsSubReaderOf (@Theory process sequence_t pc_main) ρ] :
+    ∀ (self : process),
+      Veil.VeilM.meetsSpecificationIfSuccessfulAssuming
+        (@evtCS.ext ρ σ process process_dec_eq process_inhabited sequence_t sequence_t_dec_eq sequence_t_inhabited
+          pc_main pc_main_dec_eq pc_main_inhabited pc_main_Enum sequence thread χ χ_rep χ_rep_lawful σ_sub ρ_sub self)
+        (@Assumptions ρ process process_dec_eq process_inhabited sequence_t sequence_t_dec_eq sequence_t_inhabited
+          pc_main pc_main_dec_eq pc_main_inhabited pc_main_Enum sequence thread ρ_sub)
+        (@Invariants ρ σ process process_dec_eq process_inhabited sequence_t sequence_t_dec_eq sequence_t_inhabited
+          pc_main pc_main_dec_eq pc_main_inhabited pc_main_Enum sequence thread χ χ_rep χ_rep_lawful σ_sub ρ_sub)
+        (@mutual_exclusion ρ σ process process_dec_eq process_inhabited sequence_t sequence_t_dec_eq
+          sequence_t_inhabited pc_main pc_main_dec_eq pc_main_inhabited pc_main_Enum sequence thread χ χ_rep
+          χ_rep_lawful σ_sub ρ_sub) :=
+  by
+  unveil
+
+  /- Current goal -/
+  /-  If process self is in it's critical section, this implies that for all processes i, j : i ≠ self and j ≠ self,
+      if both i and j are in their critical sections, then i = j.
+
+      The state of self is the only one that changes under this transition
+  -/
+
+  show  st.pc self = cs →
+          ∀ (I J : process),
+            (if self = I then exit else st.pc I) = cs →
+              (if self = J then exit else st.pc J) = cs →
+                I = J
+
+  -- In the implication above, we extract all predicates
+  intros self_was_cs i j i_cs j_cs
+
+  -- Invariants
+  rcases hinv with ⟨num_non_zero, flag_raised, nxt_not_self, unchecked_not_self, critical_section, nxt_e2_e3, cs_precedes_all, mutex⟩
+
+  -- Now the goal is to show, under the previous assumptions, i = j.
+  show i = j
+
+
+  apply mutex
+
+  /-  We know that i and j were mutually exclusive in the last state, and process self
+      is now entering CS. By applying mutex, we just need to show that i and j are in cs.
+
+  -/
+
+  · -- First show state i = cs
+    show st.pc i = cs
+
+    by_cases self_is_i : (i = self)
+
+    -- Case that self = i
+    · rw [self_is_i]
+      exact self_was_cs
+
+    -- Case self ≠ i
+
+    · rw [if_neg (Ne.symm self_is_i)] at i_cs
+      exact i_cs
+  · -- Now show state j = cs
+    show st.pc j = cs
+
+    by_cases self_is_j : (j = self)
+    · rw [self_is_j]
+      exact self_was_cs
+    · rw [if_neg (Ne.symm self_is_j)] at j_cs
+      exact j_cs
+
+
+
+
+
+
+
+
+
+
+#print axioms evtCS_mutual_exclusion
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+-- temporal [success] ∀ x : process, 𝒲ℱ (evtW2 x) → ◇ ⌜ vCritical x ⌝
+
+-- prove_temporal_by [success]
+
+--   tstart hInit hNext hInv
+--   tclear hInv
+--   tdsimp only [success]
+--   intro hwf
+
+
 
 --   sorry
-
-
-temporal [success] ∀ x : process, 𝒲ℱ (evtW2 x) → ◇ ⌜ vCritical x ⌝
-
-prove_temporal_by [success]
-
-  tstart hInit hNext hInv
-  tclear hInv
-  tdsimp only [success]
-  intro hwf
-
-
-
-  sorry
 
 
 /-
@@ -243,7 +375,7 @@ So the corresponding parameters here are:
 -- #model_check
 -- { process := Fin 2,
 --   sequence_t := Fin 3,
---   pc_state := pc_state_IndT }
+--   pc_main := pc_main_IndT }
 -- { one_th := 1,
 --   one := 1 }
 
