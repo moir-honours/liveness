@@ -5,8 +5,13 @@ import Veil
 
 veil module BakeryDistributed
 
+type node
 
 
+@[veil_decl] structure Message (node : Type) where
+  payload : node
+  src : node
+  dst : node
 
 
 end BakeryDistributed

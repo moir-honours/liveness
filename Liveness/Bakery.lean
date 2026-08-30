@@ -5,6 +5,7 @@ veil module Bakery
 
 type process
 type sequence_t
+type procSet
 
 
 -- Process states
@@ -13,15 +14,22 @@ enum pc_main = { ncs, e1, e2, e3, e4, w1, w2, cs, exit }
 -- Sequence is for ticket numbers, thread is for process ids
 instantiate sequence : TotalOrderWithZero sequence_t
 instantiate thread : TotalOrderWithZero process
+instantiate pset : TSet process procSet
+
 
 immutable individual one_th: process
 immutable individual one: sequence_t
 
 /- Variables -/
 function number : process → sequence_t
-function flag : process → Bool
-relation unchecked: process → process → Bool
-function max : process → sequence_t
+function flag : process → Bool          -- Shows a process is choosing
+
+
+-- TODO: Refactor unchecked to use a set
+relation unchecked: process → process → Bool -- Used to check ticket nums
+function unchecked_set: process → procSet
+
+function max : process → sequence_t -- Largest ticker number a process has seen
 function nxt : process → process
 function pc : process → pc_main
 
@@ -40,6 +48,10 @@ assumption [one_index_th] ∀i, thread.le thread.zero i
 assumption [nat_gt_zero] ∀n, sequence.le sequence.zero n
 assumption [zero_one] next sequence.zero one
 
+
+
+
+/- Ghost relations (for specification only) -/
 
 ghost relation vCritical (v : process) :=
   (pc v = cs)
@@ -67,6 +79,9 @@ ghost relation pc_e4_w1_w2 (i j : process) :=
 
 ghost relation before (i j : process) :=
   number_gt_zero i ∧ (pc_ncs_e1_exit j ∨ pc_ex i j ∨ pc_e3 i j ∨ pc_e4_w1_w2 i j)
+
+
+
 
 
 
@@ -108,13 +123,13 @@ action _evtE1_branch2 (self : process) {
 
 action evtE2 (self : process) {
   require pc self = e2
-  if (∃i, unchecked self i) then
-    let i :| unchecked self i
-    unchecked self i := false
-    let number_i := number i
+  if (∃k, unchecked self k) then
+    let k :| unchecked self k
+    unchecked self k := false
+    let number_k := number k
     let max_self := max self
-    if lt max_self number_i then
-      max self := number_i
+    if lt max_self number_k then
+      max self := number_k
     pc self := e2
   else
     pc self := e3
@@ -157,11 +172,11 @@ action evtE4_branch2 (self : process) {
 
 action evtW1 (self : process) {
   require pc self = w1
-  if (∃i, unchecked self i) then
-    let i ← pick process
-    assume unchecked self i
-    nxt self := i
-    require ¬ flag i
+  if (∃k, unchecked self k) then
+    let k ← pick process
+    assume unchecked self k
+    nxt self := k
+    require ¬ flag k
     pc self := w2
   else
     pc self := cs
@@ -403,6 +418,7 @@ theorem evtCS_mutual_exclusion (ρ : Type) (σ : Type) (process : Type) [process
 
 temporal [success] ∀ x : process, 𝒲ℱ (evtW1 x) → ◇ ⌜ vCritical x ⌝
 
+
 prove_temporal_by [success]
 
 
@@ -411,6 +427,9 @@ prove_temporal_by [success]
   tclear hInv
   tdsimp only [success]
   intro hwf
+
+
+
 
 
   -- Reduce goal to `v not in critical ↝  v in critical`
