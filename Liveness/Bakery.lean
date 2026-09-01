@@ -1,6 +1,8 @@
 import Veil
 import Veil.Liveness
 
+open TLA
+
 veil module Bakery
 
 type process
@@ -40,15 +42,7 @@ assumption [one_index_th] ∀i, thread.le thread.zero i
 assumption [nat_gt_zero] ∀n, sequence.le sequence.zero n
 assumption [zero_one] next sequence.zero one
 
-
-
-
 /- Ghost relations (for specification only) -/
-ghost relation vCritical (v : process) :=
-  (pc v = cs)
-
-ghost relation vNotCritical (v : process) :=
-  (pc v ≠ cs)
 
 ghost relation prec (a1 b1 : sequence_t) (a2 b2 : process) :=
   (lt a1 b1 ∨ (a1 = b1 ∧ lt_thread a2 b2))
@@ -71,6 +65,8 @@ ghost relation pc_e4_w1_w2 (i j : process) :=
 ghost relation before (i j : process) :=
   number_gt_zero i ∧ (pc_ncs_e1_exit j ∨ pc_ex i j ∨ pc_e3 i j ∨ pc_e4_w1_w2 i j)
 
+ghost relation at_e1 (i : process) := pc i = e1
+ghost relation at_e2 (i : process) := pc i = e2
 
 
 -- Initial State
@@ -90,7 +86,6 @@ action evtNCS (self : process) {
 }
 
 /- Doorway starts -/
-
 action evtE1_branch1 (self : process) {
   require pc self = e1
   flag self := !(flag self)
@@ -158,6 +153,7 @@ action evtE4_branch2 (self : process) {
 /- Doorway Ends -/
 
 
+/- Wait to enter CS -/
 action evtW1 (self : process) {
   require pc self = w1
   if (∃k, unchecked self k) then
@@ -170,8 +166,7 @@ action evtW1 (self : process) {
     pc self := cs
 }
 
-
-
+/- Check process in loop -/
 action evtW2 (self : process) {
   require pc self = w2
   let nxt_self := nxt self
@@ -182,14 +177,10 @@ action evtW2 (self : process) {
   pc self := w1
 }
 
-
-
 action evtCS (self : process) {
   require pc self = cs
   pc self := exit
 }
-
-
 
 action evtExit_branch1 (self : process) {
   require pc self = exit
@@ -204,7 +195,7 @@ action evtExit_branch2 (self : process) {
   pc self := ncs
 }
 
-
+/- Invariants -/
 
 invariant [p1_non_zero_number]
   pc I = e4 ∨ pc I = w1 ∨ pc I = w2 ∨ pc I = cs →
@@ -237,18 +228,20 @@ invariant [p7_cs_precedes_all]
     ∀j, (j ≠ I) →
       before I j
 
+invariant [p8_]
+  pc I = w1 ∨ pc I = w2 →
+    ∀ j, (j ≠ I ∧ ¬ unchecked I j) →
+      pc j ≠ cs
+
 /- Ensures no two processes are in critical section simultaneously. -/
 safety [mutual_exclusion]
   pc I = cs ∧ pc J = cs → I = J
 
 set_option maxHeartbeats 2500000
 
-
-
 #gen_spec
 
-#check_invariants
-
+/- Manual proofs of mutual exclusion under state transitions -/
 
 @[veil]
 theorem evtW1_mutual_exclusion (ρ : Type) (σ : Type) (process : Type) [process_dec_eq : DecidableEq.{1} process]
@@ -299,7 +292,7 @@ theorem evtW1_mutual_exclusion (ρ : Type) (σ : Type) (process : Type) [process
 
   -- Introduce predicates and invariants
   intro self_was_w1
-  rcases hinv with ⟨num_non_zero, flag_raised, nxt_not_self, unchecked_not_self, critical_section, nxt_e2_e3, cs_precedes_all, mutex⟩
+  rcases hinv with ⟨num_non_zero, flag_raised, nxt_not_self, unchecked_not_self, critical_section, nxt_e2_e3, cs_precedes_all, new, mutex⟩
 
 
   -- Handle each branch of the if in W1 seperately.
@@ -312,25 +305,41 @@ theorem evtW1_mutual_exclusion (ρ : Type) (σ : Type) (process : Type) [process
 
     sorry
 
-
-
-
   · -- There doesn't exists i : unchecked self i = true
     intro i j self_neq_i_implies_cs_i self_neq_j_implies_cs_j
     show i = j
-    apply mutex
 
 
-    -- Check if
-    · show st.pc i = cs
-      by_cases h : (self = i)
-      ·
+    -- To show i = j, given the hypotheses, we split into the cases where i,j = self or not.
 
-        sorry
-      · exact self_neq_i_implies_cs_i h
+    by_cases hsi : (i = self)
+    · by_cases hsj : (j = self)
 
-    · show st.pc j = cs
-      sorry
+      · -- i = self ∧ j = self
+        rw [hsi, hsj]
+
+      · -- i = self ∧ j ≠ self
+        -- We must show this case is impossible
+        rw [_root_.not_exists] at h₁
+
+        have h_j_checked : ¬st.unchecked self j :=
+          by exact h₁ j
+
+        rw [Bool.not_eq_true] at h_j_checked
+
+        have h_j_cs : st.pc j = cs :=
+          by exact self_neq_j_implies_cs_j (mt Eq.symm hsj)
+
+        -- Apply invariant
+        have res1 := new self (Or.inl self_was_w1) j hsj h_j_checked
+        exact absurd h_j_cs res1
+
+
+    · by_cases hsj : (j = self)
+      · sorry
+      · sorry
+
+
 
 
 
@@ -377,7 +386,7 @@ theorem evtCS_mutual_exclusion (ρ : Type) (σ : Type) (process : Type) [process
 
   -- Extract all predicates from the statement above, then bring all invariants into the context
   intros self_was_cs i j i_cs j_cs
-  rcases hinv with ⟨num_non_zero, flag_raised, nxt_not_self, unchecked_not_self, critical_section, nxt_e2_e3, cs_precedes_all, mutex⟩
+  rcases hinv with ⟨num_non_zero, flag_raised, nxt_not_self, unchecked_not_self, critical_section, new, nxt_e2_e3, cs_precedes_all, mutex⟩
 
   -- Now the goal is to show, under the previous assumptions, i = j.
   show i = j
@@ -404,35 +413,8 @@ theorem evtCS_mutual_exclusion (ρ : Type) (σ : Type) (process : Type) [process
 
 
 
-temporal [success] ∀ x : process, 𝒲ℱ (evtW1 x) → ◇ ⌜ vCritical x ⌝
-
-prove_temporal_by [success]
-
-
-  tstart hInit hNext hInv
-
-  tclear hInv
-  tdsimp only [success]
-  intro hwf
-
-
-
-
-  -- Reduce goal to `v not in critical ↝  v in critical`
-
-
-  -- tsuffices hleadsto :
-  --   ∀ v : process,
-  --     ⌜fun st => (veil_term% vNotCritical) st⌝ ↝
-  --       ⌜fun st => (veil_term% vCritical) st⌝ by
-    -- sorry
-
-
-  sorry
-
-
-
-
+#check_invariants
+/- Model checking -/
 
 
 /-
@@ -449,6 +431,71 @@ So the corresponding parameters here are:
 --   pc_main := pc_main_IndT }
 -- { one_th := 1,
 --   one := 1 }
+
+
+
+
+/- Liveness proofs -/
+
+
+temporal [progress_e1]
+  ∀ self,
+    𝒲ℱ (_evtE1_branch2 self) →
+      ⌜fun st => at_e1 self st ⌝ ↝
+        ⌜fun st => at_e2 self st ⌝
+
+#check @Bakery.Next.tr_abstract
+#check @Bakery.NextTr
+
+prove_temporal_by [progress_e1]
+  tstart hInit hNext hInv
+  tclear hInv
+  tclear hInit
+
+  tdsimp only [progress_e1]
+  tintro self hwf
+
+  -- tclear hInit
+  trevert hNext hwf
+  trewrite [← TLA.and_imp]
+
+
+  tdsimp only [NextStep]
+
+  -- Use weak fairness to prove leads to
+  tapply wf1_original
+  tsplit_ands
+  all_goals
+    tmonotone
+
+  ·
+    veil_solve_temporal
+
+
+    sorry
+  · veil_solve_temporal
+  · veil_solve_temporal
+
+
+
+
+-- /-- A (relatively) original presentation of the `wf1` rule. -/
+-- theorem wf1_original (p q : pred σ) (next a : action σ) :
+--   ((p ∧ ⟨next⟩ ⇒ ◯ (p ∨ q)) ∧
+--    ((p ∧ ⟨next⟩ ∧ ⟨a⟩ ⇒ ◯ q)) ∧
+--    ((p ⇒ Enabled a))) |-tla- (□ ⟨next⟩ ∧ 𝒲ℱ a → p ↝ q) := by
+--   tstart hpuntilq haq henable
+--   trintro ⟨hnext, hfair⟩
+--   tapply wf1 (next := next) (a := a)
+--   tsplit_ands
+--   · rw [later_or] ; tapply hpuntilq
+--   · tapply haq
+--   · intro e ⟨_, _, henable, _⟩ k hp
+--     exact Or.inl (henable k hp)
+--   · tapply hnext
+--   · tapply hfair
+
+  -- Reduce goal to `v not in critical ↝  v in critical`
 
 
 end Bakery
