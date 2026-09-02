@@ -503,34 +503,51 @@ temporal [progress_e1]
 
 prove_temporal_by [progress_e1]
   tstart hInit hNext hInv
-  tclear hInv
   tclear hInit
 
   tdsimp only [progress_e1]
   tintro self hwf
 
-  -- tclear hInit
   trevert hNext hwf
   trewrite [← TLA.and_imp]
 
 
-  tdsimp only [NextStep]
 
   -- Use weak fairness to prove leads to
   tapply wf1_original
+
   tsplit_ands
   all_goals
     tmonotone
 
   ·
+    tintro a
+    trcases a with ⟨hp, hnext⟩
+    tfinite_window
+    unfold NextStep at hnext
+    simp only [NextTr] at hnext
+    obtain ⟨label, hnext⟩ := hnext
+    cases label
+    · simp only [Label.rec] at hnext
+      sorry
+    · sorry
+    · sorry
+    · sorry
+    · sorry
+    · sorry
+    · sorry
+    · sorry
+    · sorry
+    · sorry
+    · sorry
+    · sorry
+    · sorry
+
+
+  ·
     veil_solve_temporal
-
-
-    sorry
-  · veil_solve_temporal
-  · veil_solve_temporal
-
-
+  ·
+    veil_solve_temporal
 
 
 -- /-- A (relatively) original presentation of the `wf1` rule. -/
