@@ -12,6 +12,8 @@ type sequence_t
 -- Process states
 enum pc_main = { ncs, e1, e2, e3, e4, w1, w2, cs, exit }
 
+
+
 -- Sequence is for ticket numbers, thread is for process ids
 instantiate sequence : TotalOrderWithZero sequence_t
 instantiate thread : TotalOrderWithZero process
@@ -241,6 +243,8 @@ set_option maxHeartbeats 2500000
 
 #gen_spec
 
+#print pc_main_EnumClass.distinct
+
 /- Manual proofs of mutual exclusion under state transitions -/
 
 @[veil]
@@ -278,7 +282,6 @@ theorem evtW1_mutual_exclusion (ρ : Type) (σ : Type) (process : Type) [process
 
   /-  We need to show that when the extW1 transition happens, mutex is preserved.
       This action can move a node either back to W2 or to CS, so both cases will need to be handled.
-
   -/
 
   show st.pc self = w1 →
@@ -294,6 +297,8 @@ theorem evtW1_mutual_exclusion (ρ : Type) (σ : Type) (process : Type) [process
   intro self_was_w1
   rcases hinv with ⟨num_non_zero, flag_raised, nxt_not_self, unchecked_not_self, critical_section, nxt_e2_e3, cs_precedes_all, new, mutex⟩
 
+  have hd := pc_main_EnumClass.distinct
+
 
   -- Handle each branch of the if in W1 seperately.
   split_ifs with h₁
@@ -303,12 +308,43 @@ theorem evtW1_mutual_exclusion (ρ : Type) (σ : Type) (process : Type) [process
     intro k unchecked_i_self n_flag_i i j i_cs j_cs
     show i = j
 
-    sorry
+    -- Split into cases where i and j are self or not.
+    by_cases hsi : (i = self)
+    · by_cases hsj : (j = self)
+
+
+
+      · rw [hsi, hsj]
+      · rw [hsi, if_pos rfl] at i_cs
+        ·
+          -- TODO: Fix this
+          -- Searches the inequality map to show w2 ≠ cs
+          have h_w2_cs : ¬ w2 = cs := by
+            have h_flat := hd.2
+            aesop
+          exact absurd i_cs h_w2_cs
+
+    · by_cases hsj : (j = self)
+      · rw [hsj, if_pos rfl] at j_cs
+        ·
+          -- TODO: Fix this
+          -- Searches the inequality map to show w2 ≠ cs
+          have h_w2_cs : ¬ w2 = cs := by
+            have h_flat := hd.2
+            aesop
+          exact absurd j_cs h_w2_cs
+      ·
+        apply mutex
+        · aesop
+        · aesop
+
+
 
   · -- There doesn't exists i : unchecked self i = true
+    -- This is the branch of the if where self actually transitions into CS, so the proof is more involved.
+
     intro i j self_neq_i_implies_cs_i self_neq_j_implies_cs_j
     show i = j
-
 
     -- To show i = j, given the hypotheses, we split into the cases where i,j = self or not.
 
@@ -336,8 +372,26 @@ theorem evtW1_mutual_exclusion (ρ : Type) (σ : Type) (process : Type) [process
 
 
     · by_cases hsj : (j = self)
-      · sorry
-      · sorry
+      · -- i ≠ self ∧ j = self
+        rw [_root_.not_exists] at h₁
+        have h_i_checked : ¬st.unchecked self i:=
+          by exact h₁ i
+        rw [Bool.not_eq_true] at h_i_checked
+
+        have h_i_cs : st.pc i = cs :=
+          by exact self_neq_i_implies_cs_i (mt Eq.symm hsi)
+
+        have res1 := new self (Or.inl self_was_w1) i hsi h_i_checked
+        exact absurd h_i_cs res1
+
+      · -- i ≠ self ∧ j ≠ self
+
+        -- We assume mutex holds in the previous state. As i and j are not self, we know
+        -- that their states are the same as before this transition. Therefore if they
+        -- are both critical, they must be the same process.
+        apply mutex
+        · exact self_neq_i_implies_cs_i (mt Eq.symm hsi)
+        · exact self_neq_j_implies_cs_j (mt Eq.symm hsj)
 
 
 
