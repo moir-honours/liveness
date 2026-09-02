@@ -498,9 +498,6 @@ temporal [progress_e1]
       ⌜fun st => at_e1 self st ⌝ ↝
         ⌜fun st => at_e2 self st ⌝
 
-#check @Bakery.Next.tr_abstract
-#check @Bakery.NextTr
-
 prove_temporal_by [progress_e1]
   tstart hInit hNext hInv
   tclear hInit
@@ -511,8 +508,6 @@ prove_temporal_by [progress_e1]
   trevert hNext hwf
   trewrite [← TLA.and_imp]
 
-
-
   -- Use weak fairness to prove leads to
   tapply wf1_original
 
@@ -520,53 +515,15 @@ prove_temporal_by [progress_e1]
   all_goals
     tmonotone
 
-  ·
-    tintro a
+  · tintro a
     trcases a with ⟨hp, hnext⟩
     tfinite_window
     unfold NextStep at hnext
     simp only [NextTr] at hnext
     obtain ⟨label, hnext⟩ := hnext
-    cases label
-    · simp only [Label.rec] at hnext
-      sorry
-    · sorry
-    · sorry
-    · sorry
-    · sorry
-    · sorry
-    · sorry
-    · sorry
-    · sorry
-    · sorry
-    · sorry
-    · sorry
-    · sorry
-
-
-  ·
-    veil_solve_temporal
-  ·
-    veil_solve_temporal
-
-
--- /-- A (relatively) original presentation of the `wf1` rule. -/
--- theorem wf1_original (p q : pred σ) (next a : action σ) :
---   ((p ∧ ⟨next⟩ ⇒ ◯ (p ∨ q)) ∧
---    ((p ∧ ⟨next⟩ ∧ ⟨a⟩ ⇒ ◯ q)) ∧
---    ((p ⇒ Enabled a))) |-tla- (□ ⟨next⟩ ∧ 𝒲ℱ a → p ↝ q) := by
---   tstart hpuntilq haq henable
---   trintro ⟨hnext, hfair⟩
---   tapply wf1 (next := next) (a := a)
---   tsplit_ands
---   · rw [later_or] ; tapply hpuntilq
---   · tapply haq
---   · intro e ⟨_, _, henable, _⟩ k hp
---     exact Or.inl (henable k hp)
---   · tapply hnext
---   · tapply hfair
-
-  -- Reduce goal to `v not in critical ↝  v in critical`
-
+    -- cases label
+    sorry
+  · veil_solve_temporal
+  · veil_solve_temporal
 
 end Bakery
