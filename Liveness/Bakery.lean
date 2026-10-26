@@ -316,20 +316,14 @@ theorem evtW1_mutual_exclusion (ρ : Type) (σ : Type) (process : Type) [process
 
       · rw [hsi, hsj]
       · rw [hsi, if_pos rfl] at i_cs
-        ·
-          -- TODO: Fix this
-          -- Searches the inequality map to show w2 ≠ cs
-          have h_w2_cs : ¬ w2 = cs := by
+        · have h_w2_cs : ¬ w2 = cs := by
             have h_flat := hd.2
             aesop
           exact absurd i_cs h_w2_cs
 
     · by_cases hsj : (j = self)
       · rw [hsj, if_pos rfl] at j_cs
-        ·
-          -- TODO: Fix this
-          -- Searches the inequality map to show w2 ≠ cs
-          have h_w2_cs : ¬ w2 = cs := by
+        · have h_w2_cs : ¬ w2 = cs := by
             have h_flat := hd.2
             aesop
           exact absurd j_cs h_w2_cs
@@ -486,11 +480,18 @@ So the corresponding parameters here are:
 -- { one_th := 1,
 --   one := 1 }
 
-
-
-
 /- Liveness proofs -/
 
+
+set_option hygiene false in
+macro "bakery_unveil" : tactic => `(tactic| (
+  clear hass
+  __liveness_narrow_action
+  __liveness_narrow_enabled
+  __liveness_narrow_localrprop
+  __veil_concretize_state_wp
+  __veil_concretize_fields_wp !
+  veil_dsimp only [nextSimp, State.Label.toCodomain, State.Label.toDomain] at *))
 
 temporal [progress_e1]
   ∀ self,
@@ -500,30 +501,44 @@ temporal [progress_e1]
 
 prove_temporal_by [progress_e1]
   tstart hInit hNext hInv
-  tclear hInit
-
+  tclear hInit hInv
   tdsimp only [progress_e1]
   tintro self hwf
-
   trevert hNext hwf
   trewrite [← TLA.and_imp]
+  /- Set up proof state and throw away unnecessary hyps-/
+  /- Introduct weak fairness -/
 
-  -- Use weak fairness to prove leads to
   tapply wf1_original
-
-  tsplit_ands
-  all_goals
-    tmonotone
-
-  · tintro a
-    trcases a with ⟨hp, hnext⟩
+  tsplit_ands <;> tmonotone
+  · /- Any step keeps e1 or reaches e2 -/
+    trintro ⟨hp, hnext⟩
     tfinite_window
-    unfold NextStep at hnext
-    simp only [NextTr] at hnext
     obtain ⟨label, hnext⟩ := hnext
-    -- cases label
-    sorry
-  · veil_solve_temporal
-  · veil_solve_temporal
+    cases label <;> simp only [NextTr] at hnext
+    all_goals
+      bakery_unveil
+      have hd := pc_main_Enum.distinct
+      simp [distinctN_pairwise_neq] at hd
+      (try split_ifs at *) <;> (try casesm* _ ∧ _, ∃ _, _) <;> (try split_ifs at *) <;>
+        (try simp only [State.mk.injEq] at *) <;> (try casesm* _ ∧ _) <;> (try subst_vars) <;>
+        (try simp only [] at ⊢) <;> (try split_ifs) <;> simp_all
+
+  · /- Taking an action reaches e2-/
+    trintro ⟨hp, -, hact⟩
+    tfinite_window
+    bakery_unveil
+    casesm* _ ∧ _
+    simp only [State.mk.injEq] at *
+    casesm* _ ∧ _
+    subst_vars
+    /- if self = self then e2, allows leaving -/
+    simp_all
+
+  · /- action is enabled whenever you're in e1-/
+    tintro hp
+    tfinite_window
+    bakery_unveil
+    simp_all
 
 end Bakery
