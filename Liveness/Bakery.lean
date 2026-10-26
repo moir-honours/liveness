@@ -73,14 +73,6 @@ ghost relation at_ncs  (i : process) := pc i = ncs
 ghost relation at_exit (i : process) := pc i = exit
 ghost relation waiting (i : process) := pc i = w1 ∨ pc i = w2
 
-/- Relations for waiting argument-/
-
-ghost relation some_cs :=
-  ∃ i, pc i = cs
-
-ghost relation unblocked (i : process) :=
-  i ≠ J → pc J = ncs ∨ (waiting J ∧ prec (number i) (number J) i J)
-
 
 -- Initial State
 after_init {
@@ -316,7 +308,7 @@ theorem evtW1_mutual_exclusion (ρ : Type) (σ : Type) (process : Type) [process
   split_ifs with h₁
 
   · -- There exists k : unchecked self k = true
-    -- k is called i in the action transition above TODO: Fix
+    -- k is called i in the action transition above
     intro k unchecked_i_self n_flag_i i j i_cs j_cs
     show i = j
 
@@ -342,7 +334,7 @@ theorem evtW1_mutual_exclusion (ρ : Type) (σ : Type) (process : Type) [process
         · aesop
         · aesop
 
-  · -- There doesn't exists i : unchecked self i = true
+  · -- There doesn't exists k : unchecked self k = true
     -- This is the branch of the if where self actually transitions into CS, so the proof is more involved.
 
     intro i j self_neq_i_implies_cs_i self_neq_j_implies_cs_j
@@ -638,8 +630,6 @@ prove_temporal_by [doorway_progress]
   exact leads_to_trans _ _ _ e h12 (leads_to_trans _ _ _ e h23 (leads_to_trans _ _ _ e h34 h4w))
 
 
-/- Waiting to CS -/
-
 temporal [before_next]
   ∀ i, ∀ k,
     □ (⌜fun st => waiting i st⌝ ∧ ⌜fun st => before i k st⌝ ∧  ◯⌜fun st => waiting i st⌝ →
@@ -647,15 +637,17 @@ temporal [before_next]
 
 prove_temporal_by [before_next]
   tstart hInit hNext hInv
+  tclear hInit hInv
+  tdsimp only [before_next]
+  tintro i k
   tmonotone
-  trintro ⟨hw, hb, hw'⟩
-
-
-
-  sorry
-
-
-
+  trintro ⟨h1, h2, h3⟩
+  tfinite_window
+  bakery_cases
+  all_goals bakery_open
+  all_goals bakery_post
+  all_goals grind [TotalOrderWithZero.le_refl, TotalOrderWithZero.le_trans,
+    TotalOrderWithZero.le_antisymm, TotalOrderWithZero.le_total, TotalOrderWithZero.zero_le]
 
 
 end Bakery
