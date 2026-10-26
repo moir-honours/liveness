@@ -1,6 +1,6 @@
 name = "liveness"
 version = "0.1.0"
-defaultTargets = ["liveness"]
+defaultTargets = ["Liveness"]
 
 [[require]]
 name = "veil"
@@ -12,7 +12,3 @@ rev = "39fb34da03c9a4cbbe05b438ecc419489ad0cff8"
 
 [[lean_lib]]
 name = "Liveness"
-
-[[lean_exe]]
-name = "liveness"
-root = "Main"
